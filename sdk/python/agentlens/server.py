@@ -18,10 +18,10 @@ class Server:
 
         app.include_router(router)
         
-        # We will mount static files once they are generated
-        # frontend_path = os.path.join(os.path.dirname(__file__), "static")
-        # if os.path.exists(frontend_path):
-        #     app.mount(route, StaticFiles(directory=frontend_path, html=True), name="agentlens")
+        # Mount static files
+        frontend_path = os.path.join(os.path.dirname(__file__), "static")
+        if os.path.exists(frontend_path):
+            app.mount(route, StaticFiles(directory=frontend_path, html=True), name="agentlens")
 
     @staticmethod
     def attach_flask(app: Any, graph: Any, route: str):
@@ -31,14 +31,15 @@ class Server:
         def get_schema():
             return jsonify(parse_langgraph(graph))
 
-        # We will serve static files once they are generated
-        # frontend_path = os.path.join(os.path.dirname(__file__), "static")
-        # @app.route(f"{route}/", defaults={"path": ""})
-        # @app.route(f"{route}/<path:path>")
-        # def serve_static(path):
-        #     if not path or path == "":
-        #         return send_from_directory(frontend_path, "index.html")
-        #     return send_from_directory(frontend_path, path)
+        # Serve static files
+        frontend_path = os.path.join(os.path.dirname(__file__), "static")
+        
+        @app.route(f"{route}/", defaults={"path": ""})
+        @app.route(f"{route}/<path:path>")
+        def serve_static(path):
+            if not path or path == "":
+                return send_from_directory(frontend_path, "index.html")
+            return send_from_directory(frontend_path, path)
 
 def attach(app: Any, graph: Any, route: str = "/agentlens"):
     """
