@@ -1,6 +1,7 @@
 from typing import Any
 from .parser import parse_langgraph
 from .server import attach as internal_attach
+from .callback import AgentLensCallbackHandler
 
 class Visualizer:
     @staticmethod
