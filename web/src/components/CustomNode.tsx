@@ -13,12 +13,19 @@ const nodeIcons: Record<string, any> = {
 
 const CustomNode = ({ data, type }: NodeProps) => {
     const config = nodeIcons[data.type as string] || nodeIcons.default;
+    const isActive = data.active;
 
     return (
         <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className={`node-container ${config.class}`}
+            animate={{
+                scale: isActive ? 1.05 : 1,
+                opacity: 1,
+                boxShadow: isActive ? "0 0 20px rgba(59, 130, 246, 0.5), 0 0 10px rgba(59, 130, 246, 0.3)" : "none",
+                borderColor: isActive ? "rgba(59, 130, 246, 0.8)" : "var(--node-border)"
+            }}
+            transition={{ duration: 0.3 }}
+            className={`node-container ${config.class} ${isActive ? 'active-node' : ''}`}
         >
             <Handle type="target" position={Position.Top} className="handle" />
             <div className="node-header">
@@ -30,6 +37,11 @@ const CustomNode = ({ data, type }: NodeProps) => {
                         {data.type as string || type}
                     </span>
                     <span className="node-label-main">{data.label as string}</span>
+                    {isActive && <motion.div
+                        layoutId="active-pill"
+                        className="absolute top-2 right-2 w-2 h-2 bg-blue-500 rounded-full animate-pulse"
+                        style={{ position: 'absolute', top: '8px', right: '8px' }}
+                    />}
                 </div>
             </div>
             <Handle type="source" position={Position.Bottom} className="handle" />
