@@ -78,6 +78,89 @@ const GraphFlow = () => {
         fetchGraph();
     }, []);
 
+    useEffect(() => {
+        // Connect to WebSocket for real-time updates
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        // In development, Vite proxied to backend, so window.location.host usually works if proxy configured.
+        // If served by backend, it definitely works.
+        const wsUrl = `${protocol}//${window.location.host}/agentlens/ws`;
+
+        let ws: WebSocket | null = null;
+        let reconnectTimer: any;
+
+        const connect = () => {
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                console.log('Connected to AgentLens Runtime');
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const message = JSON.parse(event.data);
+
+                    if (message.type === 'chain_start' && message.node_id) {
+                        setNodes((nds) => nds.map(n => ({
+                            ...n,
+                            data: {
+                                ...n.data,
+                                active: n.id === message.node_id
+                            }
+                        })));
+                    }
+                    else if (message.type === 'chain_end') {
+                        // Clear active state on chain end (or handling specific run_id if complex)
+                        // For simple visualization, clearing all active states on chain execution end (graph end) is safer,
+                        // but for node-level, we might want to keep it active until next node starts?
+                        // LangGraph runs are granular.
+
+                        // If we want to "pulse" travel, we can clear active after a delay?
+                        // Or just let the next chain_start clear it (since we filter by id).
+
+                        // Current logic: un-highlight everything when a chain ends? 
+                        // No, user might want to see the last step.
+                        // But 'chain_end' usually means a node finished.
+
+                        // Let's toggle off for the specific node if we knew the ID, but chain_end doesn't always have node_id in the event payload yet. 
+                        // We can assume for now we just clear active states if it's a high-level chain end, or just rely on new start events.
+
+                        // Better UX: keep active until next activation. 
+                        // But if execution stops, we don't want it permanently glowing.
+
+                        setTimeout(() => {
+                            setNodes((nds) => nds.map(n => ({
+                                ...n,
+                                data: { ...n.data, active: false }
+                            })));
+                        }, 500);
+                    }
+                } catch (e) {
+                    console.error('Error parsing WS message', e);
+                }
+            };
+
+            ws.onclose = () => {
+                console.log('WS Disconnected, retrying...');
+                reconnectTimer = setTimeout(connect, 3000);
+            };
+
+            ws.onerror = (err) => {
+                console.log("WS Error", err);
+                ws?.close();
+            };
+        };
+
+        connect();
+
+        return () => {
+            if (ws) {
+                ws.onclose = null; // Prevent reconnect on unmount
+                ws.close();
+            }
+            if (reconnectTimer) clearTimeout(reconnectTimer);
+        };
+    }, [setNodes]);
+
     const onLayout = useCallback(
         (direction: string) => {
             const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
