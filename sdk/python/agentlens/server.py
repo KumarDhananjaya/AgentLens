@@ -1,12 +1,36 @@
 import os
 import json
-from typing import Any
+import asyncio
+from typing import Any, List
 from .parser import parse_langgraph
+
+# Global manager for WebSocket connections
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: List[Any] = [] # WebSocket objects
+
+    async def connect(self, websocket: Any):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: Any):
+        self.active_connections.remove(websocket)
+
+    async def broadcast(self, message: str):
+        # Broadcast to all connected clients
+        for connection in self.active_connections:
+            try:
+                await connection.send_text(message)
+            except Exception:
+                # Handle disconnection or errors gracefully
+                pass
+
+manager = ConnectionManager()
 
 class Server:
     @staticmethod
     def attach_fastapi(app: Any, graph: Any, route: str):
-        from fastapi import APIRouter
+        from fastapi import APIRouter, WebSocket, WebSocketDisconnect
         from fastapi.responses import JSONResponse
         from fastapi.staticfiles import StaticFiles
         
@@ -15,6 +39,18 @@ class Server:
         @router.get("/schema")
         async def get_schema():
             return parse_langgraph(graph)
+
+        @router.websocket("/ws")
+        async def websocket_endpoint(websocket: WebSocket):
+            await manager.connect(websocket)
+            try:
+                while True:
+                    # Keep connection alive, maybe listen for ping/commands
+                    data = await websocket.receive_text()
+            except WebSocketDisconnect:
+                manager.disconnect(websocket)
+            except Exception:
+                manager.disconnect(websocket)
 
         app.include_router(router)
         
@@ -25,6 +61,8 @@ class Server:
 
     @staticmethod
     def attach_flask(app: Any, graph: Any, route: str):
+        # NOTE: Flask WebSocket support requires flask-sock or similar. 
+        # For now, we focus on FastAPI for streaming support as per plan.
         from flask import jsonify, send_from_directory
         
         @app.route(f"{route}/schema")
